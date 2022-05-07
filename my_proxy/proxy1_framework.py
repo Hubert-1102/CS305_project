@@ -1,5 +1,9 @@
+import ctypes
+import inspect
 import math
+import os
 import sys
+import threading
 import time
 from urllib import request
 from flask import Flask, Response, Request
@@ -10,20 +14,15 @@ rates = []
 
 
 @app.route('/')
-def simple():
+def get_page():
     url = 'http://127.0.0.1:8080'
     print(url)
     return Response(requests.get(url))
 
 
-@app.route('/swfobject.js')
-def simple2():
-    return Response(requests.get('http://127.0.0.1:8080/swfobject.js'))
-
-
-@app.route('/StrobeMediaPlayback.swf')
-def simple1():
-    return Response(requests.get('http://127.0.0.1:8080/StrobeMediaPlayback.swf'))
+@app.route('/<part>')
+def forward(part):
+    return Response(requests.get('http://127.0.0.1:8080/%s' % part))
 
 
 throughput = None
@@ -52,6 +51,8 @@ def video(part):
         # chars[1] represent frag number
         global throughput
         if count == 1:
+            global flag
+            flag = True
             content = Response(requests.get('http://127.0.0.1:8080/vod/100Seg1-Frag1'))
             size = sys.getsizeof(content.data)
             end = time.time()
@@ -70,12 +71,10 @@ def video(part):
             print(throughput)
             content = Response(
                 requests.get('http://127.0.0.1:8080/vod/%d%s%s%s%s' % (my_rate, 'Seg', chars2[0], '-Frag', chars2[1])))
-            end = time.time()
-            size = sys.getsizeof(content.data)
             alpha = 0.3
-            t = size * 8 / ((end - begin) * 1024)
-            throughput = alpha * t + (1 - alpha) * throughput
-            logging(begin_time, end - begin, t, throughput, my_rate, 8080, 'Seg%s-Frag%s' % (chars2[0], chars2[1]))
+            t = calculate_throughput(sys.getsizeof(content.data), begin, time.time(), alpha)
+            logging(begin_time, time.time() - begin, t, throughput, my_rate, 8080,
+                    'Seg%s-Frag%s' % (chars2[0], chars2[1]))
         count += 1
         return content
 
@@ -99,13 +98,79 @@ def request_dns():
     """
 
 
-def calculate_throughput():
+def calculate_throughput(size, begin, end, alpha):
     """
     Calculate throughput here.
     """
+    global throughput
+    t = size * 8 / ((end - begin) * 1024)
+    throughput = alpha * t + (1 - alpha) * throughput
+    return t
 
 
 log_file = open('log_file.txt', 'a')
+flag = False
+
+
+def _async_raise(tid, exctype):
+    """raises the exception, performs cleanup if needed"""
+
+    tid = ctypes.c_long(tid)
+
+    if not inspect.isclass(exctype):
+        exctype = type(exctype)
+
+    res = ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, ctypes.py_object(exctype))
+
+    if res == 0:
+
+        raise ValueError("invalid thread id")
+
+    elif res != 1:
+
+        # """if it returns a number greater than one, you're in trouble,
+
+        # and you should call it again with exc=NULL to revert the effect"""
+
+        ctypes.pythonapi.PyThreadState_SetAsyncExc(tid, None)
+
+        raise SystemError("PyThreadState_SetAsyncExc failed")
+
+
+def stop_thread(thread):
+    _async_raise(thread.ident, SystemExit)
+
+
+class clock(threading.Thread):
+    def __init__(self):
+        threading.Thread.__init__(self)
+
+    def run(self):
+        global count
+        while True:
+            last = count
+            time.sleep(2)
+            now = count
+            if (now == last and flag):
+                stop_thread(thread_main)
+                sys.exit(0)
+
+
+class main_thread(threading.Thread):
+    def __init__(self):
+        threading.Thread.__init__(self)
+
+    def run(self):
+        app.run(port=21102)
+
+
+# def stop_thread(thread):
+#     _async_raise(thread.ident, SystemExit)
+Time = clock()
+thread_main = main_thread()
 
 if __name__ == '__main__':
-    app.run(port=21102)
+    Time.start()
+    thread_main.start()
+
+    # app.run(port=21102)
