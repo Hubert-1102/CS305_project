@@ -1,3 +1,4 @@
+import math
 import sys
 import time
 from urllib import request
@@ -45,6 +46,7 @@ def video(part):
     else:
         global count
         begin = time.time()
+        begin_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
         chars1 = part.split('Seg')  # chars[0] represent rate
         chars2 = chars1[1].split('-Frag')  # chars2[0] represent segment number
         # chars[1] represent frag number
@@ -54,7 +56,7 @@ def video(part):
             size = sys.getsizeof(content.data)
             end = time.time()
             throughput = size * 8 / ((end - begin) * 1024)
-            logging(begin, end - begin, throughput, throughput, 10, 8080, 'Seg1-Frag1')
+            logging(begin_time, end - begin, throughput, throughput, 10, 8080, 'Seg1-Frag1')
             # print(throughput)
         else:
             my_rate = 10
@@ -70,16 +72,17 @@ def video(part):
                 requests.get('http://127.0.0.1:8080/vod/%d%s%s%s%s' % (my_rate, 'Seg', chars2[0], '-Frag', chars2[1])))
             end = time.time()
             size = sys.getsizeof(content.data)
-            alpha = 0.5
+            alpha = 0.3
             t = size * 8 / ((end - begin) * 1024)
             throughput = alpha * t + (1 - alpha) * throughput
-            logging(begin, end - begin, t, throughput, my_rate, 8080, 'Seg%s-Frag%s' % (chars2[0], chars2[1]))
+            logging(begin_time, end - begin, t, throughput, my_rate, 8080, 'Seg%s-Frag%s' % (chars2[0], chars2[1]))
         count += 1
         return content
 
 
 def logging(begin, spend, throughput, avgtput, bitrate, port, chunkname):
-    log_file.write('%.2f\t%.2f\t%.2f\t%.2f\t%s\t%s\t%s\n' % (begin, spend, throughput, avgtput, bitrate, port, chunkname))
+    # begin_time=time.strftime('%Y-%m-%d %H:%M:%S',begin)
+    log_file.write('%s\t%.4f\t%.2f\t%.2f\t%s\t%s\t%s\n' % (begin, spend, throughput, avgtput, bitrate, port, chunkname))
 
 
 def modify_request(message):
@@ -102,7 +105,7 @@ def calculate_throughput():
     """
 
 
-log_file = open('log.txt', 'a')
+log_file = open('log_file.txt', 'a')
 
 if __name__ == '__main__':
     app.run(port=21102)
