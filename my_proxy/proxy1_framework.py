@@ -1,39 +1,37 @@
 import ctypes
 import inspect
 import socket
+import logging
 import math
 import os
 import sys
 import threading
 import time
+from sys import argv
 from urllib import request
 from flask import Flask, Response, Request
 import requests
+import dns_server
 
 ip = '127.0.0.1'
 port = 5566
 dns_ip = '127.0.0.1'
-dns_port = 5533
 app = Flask(__name__)
 rates = []
-request_port = '8080'
 request_url = 'http://127.0.0.1'
-url_port = 'http://127.0.0.1:8080'
+
 
 @app.route('/')
 def get_page():
     url = url_port
     print(url)
-    return Response(requests.get(url))
+    return Response(requests.get('http://localhost:8080'))
 
 
 @app.route('/<part>')
 def forward(part):
-    return Response(requests.get('%s/%s' % (url_port,part)))
-
-
-throughput = None
-count = 1
+    # if part != 'favicon.ico':
+    return Response(requests.get('%s/%s' % (url_port, part)))
 
 
 @app.route('/vod/<string:part>')
@@ -63,8 +61,11 @@ def video(part):
             content = Response(requests.get('%s/vod/100Seg1-Frag1' % url_port))
             size = sys.getsizeof(content.data)
             end = time.time()
-            throughput = size * 8 / ((end - begin) * 1024)
-            logging(begin_time, end - begin, throughput, throughput, 10, int(request_port), 'Seg1-Frag1')
+            if end-begin==0:
+                throughput=10000
+            else:
+                throughput = size * 8000 / ((end * 1000 - begin * 1000) * 1024)
+            logging1(begin_time, end - begin, throughput, throughput, 10, int(request_port), 'Seg1-Frag1')
             # print(throughput)
         else:
             my_rate = 10
@@ -78,15 +79,15 @@ def video(part):
             print(throughput)
             content = Response(
                 requests.get('%s/vod/%d%s%s%s%s' % (url_port, my_rate, 'Seg', chars2[0], '-Frag', chars2[1])))
-            alpha = 0.3
+
             t = calculate_throughput(sys.getsizeof(content.data), begin, time.time(), alpha)
-            logging(begin_time, time.time() - begin, t, throughput, my_rate, int(request_port),
-                    'Seg%s-Frag%s' % (chars2[0], chars2[1]))
+            logging1(begin_time, time.time() - begin, t, throughput, my_rate, int(request_port),
+                     'Seg%s-Frag%s' % (chars2[0], chars2[1]))
         count += 1
         return content
 
 
-def logging(begin, spend, throughput, avgtput, bitrate, port, chunkname):
+def logging1(begin, spend, throughput, avgtput, bitrate, port, chunkname):
     # begin_time=time.strftime('%Y-%m-%d %H:%M:%S',begin)
     log_file.write('%s\t%.4f\t%.2f\t%.2f\t%s\t%s\t%s\n' % (begin, spend, throughput, avgtput, bitrate, port, chunkname))
 
@@ -98,8 +99,18 @@ def modify_request(message):
     for client and leave big_buck_bunny.f4m for the use in proxy.
     """
 
+
 socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 socket.bind((ip, port))
+
+
+class DNSServer(threading.Thread):
+    def __init__(self):
+        threading.Thread.__init__(self)
+
+    def run(self):
+        dns_server.DNSServer(ip='127.0.0.1', port=int(dns_port)).start()
+
 
 class DNSRequest(threading.Thread):
     def __init__(self):
@@ -107,13 +118,15 @@ class DNSRequest(threading.Thread):
 
     def run(self):
         while True:
+            global request_port, url_port
+            if exit_flag:
+                socket.sendto('esc'.encode(), (dns_ip, int(dns_port)))
+                sys.exit(0)
             time.sleep(4)
-            socket.sendto(''.encode(), (dns_ip, dns_port))
-            #print(socket.recv(2333))
+            socket.sendto(''.encode(), (dns_ip, int(dns_port)))
+            # print(socket.recv(2333))
             request_port = (socket.recv(2333)).decode()
-            url_port = request_url + request_port
-
-
+            url_port = request_url + ':' + request_port
 
 
 def calculate_throughput(size, begin, end, alpha):
@@ -121,13 +134,12 @@ def calculate_throughput(size, begin, end, alpha):
     Calculate throughput here.
     """
     global throughput
-    t = size * 8 / ((end - begin) * 1024)
+    if end-begin==0:
+        t=10000
+    else:
+        t = size * 8 / ((end - begin) * 1024)
     throughput = alpha * t + (1 - alpha) * throughput
     return t
-
-
-log_file = open('log_file.txt', 'a')
-flag = False
 
 
 def _async_raise(tid, exctype):
@@ -170,9 +182,14 @@ class clock(threading.Thread):
             time.sleep(4)
             now = count
             if (now == last and flag):
+                global exit_flag
+                # exit(0)
+                exit_flag=True
                 stop_thread(thread_main)
-                stop_thread(dns_request)
-                sys.exit(0)
+                # if (len(argv) == 5):
+                #     stop_thread(dns_request)
+                #     stop_thread(dns)
+                exit(0)
 
 
 class main_thread(threading.Thread):
@@ -180,17 +197,48 @@ class main_thread(threading.Thread):
         threading.Thread.__init__(self)
 
     def run(self):
-        app.run(port=21102)
+        app.run(port=listen_port)
 
 
-# def stop_thread(thread):
-#     _async_raise(thread.ident, SystemExit)
-Time = clock()
-thread_main = main_thread()
-dns_request = DNSRequest()
+USAGE = '用法错误，请按如下格式输入:\n./proxy <log> <alpha> <listen-port> <dns-port> [<default-port>]'
 
-if __name__ == '__main__':
+if len(argv) < 5:
+    print(USAGE)
+    exit(1)
+# global request_port, alpha,  url_port,dns_port
+global log_file
+exit_flag=False
+request_port=8080
+flag = False
+throughput = None
+count = 1
+url_port = 'http://localhost:8080'
+# global file_log,alpha,listen_port,dns_port,port_request
+if len(argv) == 6:
+    name, open_file, alpha, listen_port, dns_port, request_port = argv
+    log_file = open(open_file, 'a')
+    alpha = float(alpha)
+    url_port = 'http://localhost:8080'
+    Time = clock()
+    thread_main = main_thread()
     Time.start()
     thread_main.start()
+
+if len(argv) == 5:
+    name, open_file, alpha, listen_port, dns_port = argv
+    log_file = open(open_file, 'a')
+    alpha = float(alpha)
+    url_port = 'http://localhost:8080'
+    dns = DNSServer()
+    Time = clock()
+    thread_main = main_thread()
+    dns_request = DNSRequest()
+    Time.start()
+    dns.start()
+    thread_main.start()
     dns_request.start()
-    # app.run(port=21102)
+# def stop_thread(thread):
+#     _async_raise(thread.ident, SystemExit)
+# logging.basicConfig(level=logging.WARNING)
+
+# app.run(port=21102)
