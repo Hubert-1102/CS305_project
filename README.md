@@ -11,3 +11,9 @@ proxy实现了对单个端口的代理，未实现通过DNS选择最优端口
 已加入日志功能
 
 已加入多线程，能在播放完视频后正常关闭代理
+
+实现dns_server 与 netsim.py 的通信，获取运行netsim.py时的参数，即需要读取的文件
+
+修改index.html文件以解决浏览器莫名其妙请求favicon.ico导致无法正常播放视频的问题
+
+proxy以及dns_server必须也在容器中运行，否则外部(dns_server)无法通过socket与netsim.py通信

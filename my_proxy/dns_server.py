@@ -5,19 +5,22 @@ import socket
 
 
 class DNSServer:
-    def __init__(self, ip='127.0.0.1', port=5533):
+    def __init__(self, ip='127.0.0.1', port=5523):
         self.index = 0
         self.ip = ip
         self.port = port
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind((self.ip, self.port))
-        self.file_name = "2servers"
+        self.file_name = "servers/2servers"
         self.servers = []
+
+    def start(self):
+        self.socket.sendto('file'.encode(), ('127.0.0.1', 5555))
+        file_receive, address2 = self.socket.recvfrom(2333)
+        self.file_name = file_receive.decode()
         with open(self.file_name) as file_object:
             for line in file_object:
                 self.servers.append(line.strip('\n'))
-
-    def start(self):
         while True:
             message, address = self.receive()
             if message.decode() == 'esc':
@@ -32,6 +35,7 @@ class DNSServer:
         self.index %= len(self.servers)
         self.socket.sendto((self.servers[self.index]).encode(), address)
 
-# if __name__ == '__main__':
-#     dns = DNSServer()
-#     dns.start()
+
+if __name__ == '__main__':
+    dns = DNSServer()
+    dns.start()

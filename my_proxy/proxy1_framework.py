@@ -18,7 +18,7 @@ port = 5566
 dns_ip = '127.0.0.1'
 app = Flask(__name__)
 rates = []
-request_url = 'http://127.0.0.1'
+request_url = 'http://localhost'
 
 
 @app.route('/')
@@ -30,7 +30,9 @@ def get_page():
 
 @app.route('/<part>')
 def forward(part):
-    # if part != 'favicon.ico':
+    # if part == 'favicon.ico':
+    #     return None
+    # else:
     return Response(requests.get('%s/%s' % (url_port, part)))
 
 
@@ -61,8 +63,8 @@ def video(part):
             content = Response(requests.get('%s/vod/100Seg1-Frag1' % url_port))
             size = sys.getsizeof(content.data)
             end = time.time()
-            if end-begin==0:
-                throughput=10000
+            if end - begin == 0:
+                throughput = 10000
             else:
                 throughput = size * 8000 / ((end * 1000 - begin * 1000) * 1024)
             logging1(begin_time, end - begin, throughput, throughput, 10, int(request_port), 'Seg1-Frag1')
@@ -80,7 +82,7 @@ def video(part):
             content = Response(
                 requests.get('%s/vod/%d%s%s%s%s' % (url_port, my_rate, 'Seg', chars2[0], '-Frag', chars2[1])))
 
-            t = calculate_throughput(sys.getsizeof(content.data), begin, time.time(), alpha)
+            t = calculate_throughput(sys.getsizeof(content.response), begin, time.time(), alpha)
             logging1(begin_time, time.time() - begin, t, throughput, my_rate, int(request_port),
                      'Seg%s-Frag%s' % (chars2[0], chars2[1]))
         count += 1
@@ -134,8 +136,8 @@ def calculate_throughput(size, begin, end, alpha):
     Calculate throughput here.
     """
     global throughput
-    if end-begin==0:
-        t=10000
+    if end - begin == 0:
+        t = 10000
     else:
         t = size * 8 / ((end - begin) * 1024)
     throughput = alpha * t + (1 - alpha) * throughput
@@ -179,12 +181,12 @@ class clock(threading.Thread):
         global count
         while True:
             last = count
-            time.sleep(4)
+            time.sleep(400)
             now = count
             if (now == last and flag):
                 global exit_flag
                 # exit(0)
-                exit_flag=True
+                exit_flag = True
                 stop_thread(thread_main)
                 # if (len(argv) == 5):
                 #     stop_thread(dns_request)
@@ -197,28 +199,40 @@ class main_thread(threading.Thread):
         threading.Thread.__init__(self)
 
     def run(self):
-        app.run(port=listen_port)
+        app.run(host='localhost',port=listen_port)
 
 
 USAGE = '用法错误，请按如下格式输入:\n./proxy <log> <alpha> <listen-port> <dns-port> [<default-port>]'
 
-if len(argv) < 5:
-    print(USAGE)
-    exit(1)
+# if len(argv) < 5:
+#     print(USAGE)
+#     exit(1)
+
 # global request_port, alpha,  url_port,dns_port
 global log_file
-exit_flag=False
-request_port=8080
+exit_flag = False
+request_port = 8080
 flag = False
 throughput = None
 count = 1
 url_port = 'http://localhost:8080'
 # global file_log,alpha,listen_port,dns_port,port_request
+if len(argv) == 1:
+    alpha=0.3
+    open_file='log_file.txt'
+    listen_port=21103
+    dns_port=5533
+    request_port=8080
+    log_file = open(open_file, 'a')
+    Time = clock()
+    thread_main = main_thread()
+    Time.start()
+    thread_main.start()
 if len(argv) == 6:
     name, open_file, alpha, listen_port, dns_port, request_port = argv
     log_file = open(open_file, 'a')
     alpha = float(alpha)
-    url_port = 'http://localhost:8080'
+    url_port = 'http://localhost:%s'%request_port
     Time = clock()
     thread_main = main_thread()
     Time.start()
