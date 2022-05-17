@@ -15,6 +15,7 @@ class DNSServer:
         self.servers = []
 
     def start(self):
+        # 向netsim.py 发送请求以获得对应文件名，只请求一次
         self.socket.sendto('file'.encode(), ('127.0.0.1', 5555))
         file_receive, address2 = self.socket.recvfrom(2333)
         self.file_name = file_receive.decode()
@@ -24,6 +25,7 @@ class DNSServer:
         while True:
             message, address = self.receive()
             if message.decode() == 'esc':
+                # 收到退出信号
                 exit(0)
             self.reply(address)
 
