@@ -70,7 +70,7 @@ def video(part):
                 throughput = 10000
             else:
                 throughput = float(size) * 8 / ((end - begin) * 1024)
-            logging1(begin_time, end - begin, throughput, throughput, 10, int(request_port), 'Seg1-Frag1')
+            logging1(time.time(), end - begin, throughput, throughput, 10, int(request_port), 'Seg1-Frag1')
             # print(throughput)
         else:
             # 根据throughout计算合适比特率
@@ -89,7 +89,7 @@ def video(part):
             s=c.headers['Content-Length']
             t = calculate_throughput(float(s), begin, time.time(), alpha)
             # 生成日志文件
-            logging1(begin_time, time.time() - begin, t, throughput, my_rate, int(request_port),
+            logging1(time.time(), time.time() - begin, t, throughput, my_rate, int(request_port),
                      'Seg%s-Frag%s' % (chars2[0], chars2[1]))
         count += 1
         return content
@@ -97,7 +97,7 @@ def video(part):
 
 def logging1(begin, spend, throughput, avgtput, bitrate, port, chunkname):
     # begin_time=time.strftime('%Y-%m-%d %H:%M:%S',begin)
-    log_file.write('%s\t%.4f\t%.2f\t%.2f\t%s\t%s\t%s\n' % (begin, spend, throughput, avgtput, bitrate, port, chunkname))
+    log_file.write('%s %.4f %.2f %.2f %s %s %s\n' % (begin, spend, throughput, avgtput, bitrate, port, chunkname))
 
 
 def modify_request(message):
