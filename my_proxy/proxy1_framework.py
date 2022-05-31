@@ -257,7 +257,7 @@ if len(argv) == 6:
 if len(argv) == 5:
     # 未给定请求端口，启动dns服务器
     name, open_file, alpha, listen_port, dns_port = argv
-    log_file = open(open_file, 'a')
+    log_file = open(open_file, 'w')
     alpha = float(alpha)
     url_port = 'http://localhost:8080'
     dns = DNSServer()

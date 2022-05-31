@@ -2,6 +2,7 @@ import asyncio
 import websockets
 
 danmu_pool = []
+comment_pool = []
 """
 this is a list containing the connected clients
 """
@@ -12,7 +13,10 @@ class danmu:
         self.time = time
         self.content = con
 
-
+# class Comment:
+#     def __init__(self,con,time):
+#         self.content=con
+#         self.time=time
 # ♉
 async def reply(websocket):
     """
@@ -26,8 +30,15 @@ async def reply(websocket):
             for i in danmu_pool:
                 if int(i.time) == int(t[1]):
                     await websocket.send(i.content)
-        else:
+        elif t[0] == '1':
             danmu_pool.append(danmu(t[1], t[2]))
+        elif t[0]=='2':
+            comment_pool.append(t[1])
+        else:#send comment
+            comments=''
+            for comment in comment_pool:
+                comments=comments+'♉'+comment
+            await websocket.send(comments)
         # for connect in websocket_pool:  # traverse the clients, send danmaku to everyone
         #     await connect.send(receive)
 
