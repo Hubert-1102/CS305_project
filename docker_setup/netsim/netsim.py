@@ -180,6 +180,7 @@ def start_servers():
                 logging.getLogger(__name__).error(e)
         else:
             try:
+                args.servers='servers/2servers'
                 configure_apache(['0.0.0.0:8080', '0.0.0.0:8081'])
                 restart_apache()
             except Exception as e:

@@ -1,10 +1,36 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-	<link rel="icon" href="data:image/ico;base64,aWNv">
-    <title>Strobe Media Playback</title>
-	<!-- <body onkeyup="whichButton(event)"></body> -->
+	<meta charset="UTF-8">
+	<title>Strobe Media Playback</title>
+  </head>
+<body>
+	<div class="screen_container" id="contents">
+		<div id="strobeMediaPlayback">
+		  <p>Alternative content</p>
+		</div>
+		<textarea id="danmakutext" type="text" placeholder="Danmaku~"></textarea>
+    	<button class="send">Send</button>	
+	</div>
+	
+	<style>
+		.screen_container {
+			position:absolute;
+			left: 100px;
+			top : 50px;
+			width: 1250px;
+			height: 770px;
+			margin: 30px auto;
+			background: rgba(0, 0, 0, 0);
+			overflow: hidden;
+			border-style: solid;
+			border-radius: 25px;
+			border-color: rgb(214, 214, 214);
+		}
+	</style>
+
     <script type="text/javascript" src="swfobject.js"></script>
+	<script src="https://cdn.staticfile.org/jquery/3.3.1/jquery.min.js"></script>
 	<script type="text/javascript">  		
         var loc = window.location.host
 		// document.addEventListener("keydown",whichButton);
@@ -28,34 +54,102 @@
 			, { allowFullScreen: "true"}
 			, { name: "strobeMediaPlayback" }
 			);
-
-		function whichButton(event,playerId){
-			alert('keyboard');
-			if(event.keycode>0){
-				player = document.getElementById(playerId);
-				player.seek(10);
-			}
+		var player = null;
+		const timers=[];
+		var connection = new WebSocket('ws://127.0.0.1:21103'); // connect to server
+		connection.onmessage = wsMessage; // invoke the function as long as receiving message
+		
+		function wsMessage(event) {
+			const danmu = createDanmaku(event.data);
+			addInterval(danmu);
 		}
+
+		setInterval(function(){
+
+			console.log(Math.round(player.getCurrentTime()));
+			connection.send('0'+'♉'+Math.round(player.getCurrentTime()));
+		},1000);
+
+		$(".send").on("click", function () {
+		const x = document.getElementById('danmakutext').value; 
+		connection.send('1'+'♉'+Math.round(player.getCurrentTime())+'♉'+x);
+		// addInterval(createDanmaku(x));
+		document.getElementById('danmakutext').value=''; 
+		});
+		function createDanmaku(text) {
+			const jqueryDom = $("<div class='bullet'>" + text + "</div>");
+			const fontColor = "rgb(0,0,0)";
+			const fontSize = "20px";
+			let top = Math.floor(Math.random() * 400) + "px";
+			const left = $(".screen_container").width() + "px";
+			jqueryDom.css({
+				"position": 'absolute',
+				"color": fontColor,
+				"font-size": fontSize,
+				"left": left,
+				"top": top,
+			});
+			$(".screen_container").append(jqueryDom);
+		return jqueryDom;
+}	
+
+		function addInterval(jqueryDom) {
+			let left = jqueryDom.offset().left - $(".screen_container").offset().left;
+			const timer = setInterval(function () {
+				left--;
+				jqueryDom.css("left", left + "px");
+				if (jqueryDom.offset().left + jqueryDom.width() < $(".screen_container").offset().left) {
+					jqueryDom.remove();
+					clearInterval(timer);
+				}
+			}, 5); // set delay as 5ms,which means the danmaku changes its position every 5ms
+			timers.push(timer);
+		}
+		var cur=0;
 		function onCurrentTimeChange(time, playerId)
 		{
 			document.getElementById("currentTime").innerHTML = time;
+			// console.log(time);
+			// cur=time;
 		}
 		
 		function onDurationChange(time, playerId)
 		{
+			console.log('xxx')
 			document.getElementById("duration").innerHTML = time;
 		}
-		var player = null;
+
+
+		document.onkeydown=function(event){
+			var keyNum=window.event ? event.keyCode :event.which;
+			console.log(keyNum);
+			if(keyNum==32){
+				var state = player.getState();
+					if (state == "ready" || state == "paused") {
+						player.play2();
+					}
+					else
+						if (state == "playing") {
+							player.pause();
+						}
+			}else if(keyNum==39){
+				cur=player.getCurrentTime();
+				console.log(cur);
+				player.seek(cur+10);
+			}else if(keyNum==37){
+				cur=player.getCurrentTime();
+				console.log(cur);
+				let t = cur>10?cur-10:0;
+				player.seek(t);
+			}
+		}
 		function onJavaScriptBridgeCreated(playerId)
 		{
 			if (player == null) {
 				player = document.getElementById(playerId);
-				
 				// Add event listeners that will update the
 				player.addEventListener("currentTimeChange", "onCurrentTimeChange");
 				player.addEventListener("durationChange", "onDurationChange");
-				player.addEventListener("keydown","whichButton");
-				// Pause/Resume the playback when we click the Play/Pause link
 				document.getElementById("play-pause").onclick = function(){
 					var state = player.getState();
 					if (state == "ready" || state == "paused") {
@@ -68,12 +162,9 @@
 					return false;
 				};
 			}
+			player.addEventListener("currentTimeChange", "onCurrentTimeChange");
+			player.addEventListener("durationChange", "onDurationChange");
 		}
-    </script>  	
-  </head>
-  <body>
-	<div id="strobeMediaPlayback">
-      <p>Alternative content</p>
-    </div>
-  </body>
+    </script>  
+</body>
 </html>

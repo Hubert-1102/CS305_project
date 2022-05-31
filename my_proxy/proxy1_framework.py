@@ -12,9 +12,10 @@ from urllib import request
 from flask import Flask, Response, Request
 import requests
 import dns_server
-
+import random
 ip = '127.0.0.1'
-port = 5566
+
+port = 5566+random.randint(1,1000)
 dns_ip = '127.0.0.1'
 app = Flask(__name__)  # flask
 rates = []
@@ -25,12 +26,13 @@ request_url = 'http://localhost'
 def get_page():
     url = url_port
     print(url)
-    return Response(requests.get('http://localhost:8080'))
+    return Response(requests.get('http://localhost:%s'%request_port))
 
 
 @app.route('/<part>')
 def forward(part):
     # 直接转发网页请求
+    print(1)
     return Response(requests.get('%s/%s' % (url_port, part)))
 
 
@@ -60,13 +62,14 @@ def video(part):
         if count == 1:  # 第一个视频片段，选择最低比特率
             global flag
             flag = True
-            content = Response(requests.get('%s/vod/100Seg1-Frag1' % url_port))
-            size = sys.getsizeof(content.data)
+            c=requests.get('%s/vod/100Seg1-Frag1' % url_port)
+            content = Response(c)
+            size = c.headers['Content-Length']
             end = time.time()
             if end - begin == 0:
                 throughput = 10000
             else:
-                throughput = size * 8 / ((end - begin) * 1024)
+                throughput = float(size) * 8 / ((end - begin) * 1024)
             logging1(begin_time, end - begin, throughput, throughput, 10, int(request_port), 'Seg1-Frag1')
             # print(throughput)
         else:
@@ -80,10 +83,11 @@ def video(part):
                 my_rate = rates[len(rates) - 1]
             print(my_rate)
             print(throughput)
-            content = Response(
-                requests.get('%s/vod/%d%s%s%s%s' % (url_port, my_rate, 'Seg', chars2[0], '-Frag', chars2[1])))
+            c=requests.get('%s/vod/%d%s%s%s%s' % (url_port, my_rate, 'Seg', chars2[0], '-Frag', chars2[1]))
+            content = Response(c)
             # 计算throughout
-            t = calculate_throughput(sys.getsizeof(content.response), begin, time.time(), alpha)
+            s=c.headers['Content-Length']
+            t = calculate_throughput(float(s), begin, time.time(), alpha)
             # 生成日志文件
             logging1(begin_time, time.time() - begin, t, throughput, my_rate, int(request_port),
                      'Seg%s-Frag%s' % (chars2[0], chars2[1]))
@@ -104,8 +108,8 @@ def modify_request(message):
     """
 
 
-socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-socket.bind((ip, port))
+socket1 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+socket1.bind((ip, port))
 
 
 class DNSServer(threading.Thread):
@@ -127,12 +131,12 @@ class DNSRequest(threading.Thread):
             global request_port, url_port
             if exit_flag:
                 # 用于正常退出dns服务器
-                socket.sendto('esc'.encode(), (dns_ip, int(dns_port)))
+                socket1.sendto('esc'.encode(), (dns_ip, int(dns_port)))
                 sys.exit(0)
             time.sleep(4)
-            socket.sendto(''.encode(), (dns_ip, int(dns_port)))
+            socket1.sendto(''.encode(), (dns_ip, int(dns_port)))
             # print(socket.recv(2333))
-            request_port = (socket.recv(2333)).decode()
+            request_port = (socket1.recv(2333)).decode()
             url_port = request_url + ':' + request_port
 
 
@@ -144,7 +148,10 @@ def calculate_throughput(size, begin, end, alpha):
     if end - begin == 0:
         t = 10000
     else:
-        t = size * 8 / ((end - begin) * 1024)
+        # print(end-begin)
+        # print(size*8)
+        t = size * 8 / (end - begin)
+        t=t/1024
     throughput = alpha * t + (1 - alpha) * throughput
     return t
 
@@ -189,7 +196,7 @@ class clock(threading.Thread):
         global count
         while True:
             last = count
-            time.sleep(4)
+            time.sleep(400)
             now = count
             if (now == last and flag):
                 # 当视频片段不在请求，flag=true表示已经开始播放视频
@@ -206,7 +213,7 @@ class main_thread(threading.Thread):
 
     def run(self):
         # 运行flask，转发服务器请求，实现代理
-        app.run(host='localhost', port=listen_port)
+        app.run(host='0.0.0.0', port=listen_port)
 
 
 USAGE = '用法错误，请按如下格式输入:\n./proxy <log> <alpha> <listen-port> <dns-port> [<default-port>]'
@@ -229,7 +236,8 @@ url_port = 'http://localhost:8080'
 #     open_file = 'log_file.txt'
 #     listen_port = 21103
 #     dns_port = 5533
-#     request_port = 8080
+#     request_port = 15641
+#     url_port='http://localhost:%s'%request_port
 #     log_file = open(open_file, 'a')
 #     Time = clock()
 #     thread_main = main_thread()
