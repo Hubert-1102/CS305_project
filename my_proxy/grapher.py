@@ -20,8 +20,8 @@ def fairness(x, y):
 
 if len(sys.argv) < 4:
     print(USAGE)
-    exit(-1)
-
+    # exit(-1)
+sys.argv=['1','log.txt','log1.txt','log2.txt']
 nsl = open(sys.argv[1]).read().split('\n')[:-1]
 
 lfs = []
@@ -38,7 +38,7 @@ for i, lf in enumerate(lfs):
         if t in BRs and [m for m in BRs[t] if m[0] == i]:
             # already have an entry at this second
             continue
-        BRs[t].append((i, int(float(br))))
+        BRs[t].append((i, int(float(br))))#BRs是比特率，i 为 0表示是log1.txt
 
         dur = float(dur)
         t_new = float(t_new)
@@ -46,7 +46,7 @@ for i, lf in enumerate(lfs):
             TPUTs[t].append((i, t_new))
             t -= 1
             dur -= 1
-        TPUTs[t].append((i, t_new * dur))
+        TPUTs[t].append((i, t_new * dur))#TRUTs是吞吐量
 
 BR_list = sorted(BRs.items(), key=lambda t: t[0])
 TPUT_list = sorted(TPUTs.items(), key=lambda t: t[0])
